@@ -153,7 +153,7 @@ def experiment(base_path: str, language: str, track: int, model_type: str, hyper
     # Train Model
     trainer = Trainer(
         accelerator="gpu", devices=1, gradient_clip_val=1.0, max_epochs=100, enable_progress_bar=False,
-        log_every_n_steps=10, logger=logger, check_val_every_n_epoch=1,
+        log_every_n_steps=1, logger=logger, check_val_every_n_epoch=1,
         callbacks=[early_stopping_callback, checkpoint_callback], min_epochs=1
     )
     trainer.fit(model, dm)

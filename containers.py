@@ -10,5 +10,5 @@ Batch = namedtuple(
     ]
 )
 Hyperparameters = namedtuple(
-    "Hyperparameters", field_names=["batch_size", "num_layers", "hidden_size", "dropout"]
+    "Hyperparameters", field_names=["batch_size", "num_layers", "hidden_size", "dropout", "scheduler_gamma"]
 )

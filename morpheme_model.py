@@ -11,12 +11,13 @@ from utils import max_pool_2d
 from utils import make_mask_2d
 from bilstm import BiLSTMEncoder
 from pytorch_lightning import LightningModule
+from torch.optim.lr_scheduler import ExponentialLR
 from morpheme_segmenter import UnsupervisedMorphemeSegmenter
 
 
 class MorphemeGlossingModel(LightningModule):
     def __init__(self, source_alphabet_size: int, target_alphabet_size: int, hidden_size: int = 128,
-                 num_layers: int = 1, dropout: float = 0.0, embedding_size: int = 128,
+                 num_layers: int = 1, dropout: float = 0.0, embedding_size: int = 128, scheduler_gamma: float = 1.0,
                  learn_segmentation: bool = True, classify_num_morphemes: bool = False):
         super().__init__()
         self.source_alphabet_size = source_alphabet_size
@@ -25,6 +26,7 @@ class MorphemeGlossingModel(LightningModule):
         self.num_layers = num_layers
         self.dropout = dropout
         self.embedding_size = embedding_size
+        self.scheduler_gamma = scheduler_gamma
         self.learn_segmentation = learn_segmentation
         self.classify_num_morphemes = classify_num_morphemes
 
@@ -53,7 +55,8 @@ class MorphemeGlossingModel(LightningModule):
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), weight_decay=0.0, lr=0.001)
-        return optimizer
+        scheduler = ExponentialLR(optimizer, gamma=self.scheduler_gamma)
+        return [optimizer], [scheduler]
 
     def encode_sentences(self, sentences: Tensor, sentence_lengths: Tensor) -> Tensor:
         char_embeddings = self.embeddings(sentences)
