@@ -1,6 +1,7 @@
 import os
 import torch
 import shutil
+import pandas as pd
 
 from data import GlossingDataset
 from pytorch_lightning import Trainer
@@ -32,7 +33,7 @@ if __name__ == '__main__':
         "Uspanteko": "usp"
     }
 
-    language = "Gitksan"
+    language = "Arapaho"
     track = 1
     language_code = language_code_mapping[language]
 
@@ -44,7 +45,7 @@ if __name__ == '__main__':
         train_file=train_file,
         validation_file=validation_file,
         test_file=test_file,
-        batch_size=2
+        batch_size=32
     )
 
     dm.prepare_data()
@@ -52,7 +53,7 @@ if __name__ == '__main__':
 
     model = MorphemeGlossingModel(
         source_alphabet_size=dm.source_alphabet_size, target_alphabet_size=dm.target_alphabet_size,
-        num_layers=1, dropout=0.1, hidden_size=512,
+        num_layers=2, dropout=0.1, hidden_size=512,
         learn_segmentation=(track == 1), classify_num_morphemes=(track == 1)
     )
     trainer = Trainer(
@@ -63,6 +64,10 @@ if __name__ == '__main__':
 
     trainer.fit(model, dm)
     model.load_from_checkpoint(checkpoint_path=os.path.join(base_path, "saved_models", "last.ckpt"))
+
+    logs = pd.read_csv(os.path.join(base_path, "logs", name, "version_0", "metrics.csv"))
+    best_val_accuracy = logs["val_accuracy"].max()
+    print(best_val_accuracy)
 
     # Get Predictions
     dm.setup(stage="test")

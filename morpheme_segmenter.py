@@ -4,7 +4,6 @@ import torch.nn as nn
 from torch import Tensor
 from utils import make_mask_2d
 from utils import make_mask_3d
-from torch_scatter import scatter_sum
 from torch.nn.functional import one_hot
 
 
@@ -112,62 +111,6 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
 
         return marginals
 
-    def predict_morphemes(self, word_encodings: Tensor, word_lengths: Tensor, morpheme_end_scores: Tensor):
-        # word_encodings: shape [#words x #chars x features]
-        # morpheme_end_scores: shape [#words x #chars]
-
-        # Get #morphemes per word
-        character_mask = make_mask_2d(word_lengths)
-        word_encodings_pooled = torch.masked_fill(
-            word_encodings, mask=character_mask.unsqueeze(-1), value=0.0
-        )
-        word_encodings_pooled = word_encodings_pooled.sum(dim=1)
-        num_morpheme_scores = self.num_morpheme_classifier(word_encodings_pooled)
-        num_morphemes = torch.argmax(num_morpheme_scores, dim=-1)
-
-        # Get Morpheme Separators
-        _, is_morpheme_separator = self.get_best_paths(morpheme_end_scores, word_lengths, num_morphemes)
-
-        # Compute Char -> Morpheme Mapping
-        character_mask_flat = character_mask.flatten()
-
-        # character_to_morpheme = torch.roll(is_morpheme_separator, shifts=1, dims=1)
-        character_to_morpheme = is_morpheme_separator
-        character_to_morpheme = character_to_morpheme.flatten()
-        character_to_morpheme = character_to_morpheme.cumsum(dim=0)
-        character_to_morpheme = character_to_morpheme + 1
-        character_to_morpheme = torch.masked_fill(
-            character_to_morpheme, mask=character_mask_flat, value=0
-        )
-
-        # Compute Morpheme Encodings
-        word_encodings = word_encodings.reshape(-1, self.hidden_size)
-        morpheme_encodings = scatter_sum(
-            word_encodings, index=character_to_morpheme, dim=0
-        )
-        morpheme_encodings = morpheme_encodings[1:, :]
-
-        # Compute Morpheme -> Word Mapping
-        num_morphemes = torch.sum(is_morpheme_separator, dim=1)
-        morpheme_mask = make_mask_2d(num_morphemes)
-        morpheme_mask_flat = morpheme_mask.flatten()
-        morpheme_mask_flat = torch.logical_not(morpheme_mask_flat)
-
-        morpheme_to_word = torch.arange(num_morphemes.shape[0])
-        morpheme_to_word = morpheme_to_word.unsqueeze(1)
-        morpheme_to_word = morpheme_to_word.expand(morpheme_mask.shape)
-        morpheme_to_word = morpheme_to_word.flatten()
-        morpheme_to_word = torch.masked_select(
-            morpheme_to_word, mask=morpheme_mask_flat
-        )
-        morpheme_to_word = morpheme_to_word.cpu().tolist()
-
-        return {
-            "morpheme_encodings": morpheme_encodings,
-            "morpheme_word_mapping": morpheme_to_word,
-            "morpheme_extraction_index": character_to_morpheme
-        }
-
     def forward(self, word_encodings: Tensor, word_lengths: Tensor, num_morphemes: Tensor = None):
         # word_encodings: shape [#words x #chars x features]
         batch_size = word_encodings.shape[0]
@@ -179,6 +122,9 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
         score_mask = score_mask.to(word_encodings.device)
 
         morpheme_end_scores = self.morpheme_end_classifier(word_encodings).squeeze(2)
+        if self.training:
+            morpheme_end_scores = morpheme_end_scores + torch.randn_like(morpheme_end_scores)
+
         morpheme_end_scores = torch.masked_fill(morpheme_end_scores, score_mask, value=self.neg_inf_val)
 
         # Get Best Scores
@@ -213,14 +159,5 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
         all_morpheme_indices = torch.arange(morpheme_encodings.shape[0], device=morpheme_mask.device)
         morpheme_indices = torch.masked_select(all_morpheme_indices, mask=morpheme_mask)
         morpheme_encodings = torch.index_select(morpheme_encodings, index=morpheme_indices, dim=0)
-
-        # Compute Entropy of Margins
-        margin_entropy = marginals * torch.log(marginals + 1e-8)
-        margin_entropy = 0.001 * margin_entropy.sum()
-
-        # Compute Score Sum Loss
-        score_sums = torch.sigmoid(morpheme_end_scores).sum(dim=1)
-        score_sum_loss = torch.pow(score_sums - num_morphemes.float() + 1, 2)
-        score_sum_loss = -0.001 * score_sum_loss.sum()
 
         return morpheme_encodings, best_path_matrix

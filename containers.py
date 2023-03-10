@@ -9,3 +9,6 @@ Batch = namedtuple(
         "morpheme_extraction_index", "morpheme_lengths", "morpheme_word_mapping", "morpheme_targets"
     ]
 )
+Hyperparameters = namedtuple(
+    "Hyperparameters", field_names=["batch_size", "num_layers", "hidden_size", "dropout"]
+)

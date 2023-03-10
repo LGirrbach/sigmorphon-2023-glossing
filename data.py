@@ -25,7 +25,6 @@ def _make_empty_datapoint() -> RawDatapoint:
 
 def _check_datapoint(datapoint: RawDatapoint) -> bool:
     source, target, morphemes = datapoint["source"], datapoint["target"], datapoint["morphemes"]
-
     if source is None:
         raise ValueError("Found Datapoint without Source.")
 
@@ -39,6 +38,9 @@ def _check_datapoint(datapoint: RawDatapoint) -> bool:
         return False
 
     if morphemes is not None and any(len(ms) != len(wls) for ms, wls in zip(morphemes, target)):
+        return False
+
+    if any(len(wls) > len(word) for word, wls in zip(source, target)):
         return False
 
     return True
@@ -116,7 +118,7 @@ def read_glossing_file(file) -> GlossingFileData:
     if track == 2:
         morphemes = [datapoint["morphemes"] for datapoint in raw_datapoints]
     else:
-        morphemes = [None for datapoint in raw_datapoints]
+        morphemes = [None for _ in raw_datapoints]
 
     if not covered:
         targets = [datapoint["target"] for datapoint in raw_datapoints]
