@@ -111,7 +111,8 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
 
         return marginals
 
-    def forward(self, word_encodings: Tensor, word_lengths: Tensor, num_morphemes: Tensor = None):
+    def forward(self, word_encodings: Tensor, word_lengths: Tensor, num_morphemes: Tensor = None,
+                training: bool = False):
         # word_encodings: shape [#words x #chars x features]
         batch_size = word_encodings.shape[0]
         max_num_chars = word_encodings.shape[1]
@@ -122,7 +123,7 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
         score_mask = score_mask.to(word_encodings.device)
 
         morpheme_end_scores = self.morpheme_end_classifier(word_encodings).squeeze(2)
-        if self.training:
+        if training:
             morpheme_end_scores = morpheme_end_scores + torch.randn_like(morpheme_end_scores)
 
         morpheme_end_scores = torch.masked_fill(morpheme_end_scores, score_mask, value=self.neg_inf_val)

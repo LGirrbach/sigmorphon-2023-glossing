@@ -114,7 +114,7 @@ class MorphemeGlossingModel(LightningModule):
 
         if self.learn_segmentation:
             morpheme_encodings, best_path_matrix = self.segmenter(
-                word_encodings, batch.word_lengths, num_morphemes_per_word
+                word_encodings, batch.word_lengths, num_morphemes_per_word, training=training
             )
 
         else:

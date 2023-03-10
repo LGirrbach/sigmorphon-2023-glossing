@@ -164,5 +164,5 @@ def experiment(base_path: str, language: str, track: int, model_type: str, hyper
 
 
 if __name__ == '__main__':
-    hparams = Hyperparameters(batch_size=2, num_layers=1, hidden_size=512, dropout=0.1)
+    hparams = Hyperparameters(batch_size=2, num_layers=1, hidden_size=512, dropout=0.1, scheduler_gamma=1.0)
     experiment(base_path="./results", language="Gitksan", track=1, model_type="ctc", hyperparameters=hparams)
