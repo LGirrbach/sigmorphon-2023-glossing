@@ -45,7 +45,7 @@ if __name__ == '__main__':
         train_file=train_file,
         validation_file=validation_file,
         test_file=test_file,
-        batch_size=32
+        batch_size=22
     )
 
     dm.prepare_data()
@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     model = MorphemeGlossingModel(
         source_alphabet_size=dm.source_alphabet_size, target_alphabet_size=dm.target_alphabet_size,
-        num_layers=2, dropout=0.1, hidden_size=512,
+        num_layers=1, dropout=0.42, hidden_size=496, scheduler_gamma=0.98,
         learn_segmentation=(track == 1), classify_num_morphemes=(track == 1)
     )
     trainer = Trainer(
@@ -78,7 +78,10 @@ if __name__ == '__main__':
     for batch_prediction in predictions:
         batch_prediction, batch_segmentation = batch_prediction
         sentence_predictions.extend(batch_prediction)
-        sentence_segmentations.extend(batch_segmentation)
+        if batch_segmentation is not None:
+            sentence_segmentations.extend(batch_segmentation)
+        else:
+            sentence_segmentations.extend([None for _ in batch_prediction])
 
     decoded_predictions = []
     for sentence_prediction, sentence_segmentation in zip(sentence_predictions, sentence_segmentations):
