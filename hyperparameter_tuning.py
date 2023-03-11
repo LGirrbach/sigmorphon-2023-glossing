@@ -51,6 +51,8 @@ def hyperparameter_tuning(base_path: str, data_path: str, language: str, track: 
     # Skip if exists
     if os.path.exists(f"./tuning/{study_name}.csv"):
         return
+    elif os.path.exists(f"./tuning/{study_name}.db"):
+        os.remove(f"./tuning/{study_name}.db")
 
     storage_name = f"sqlite:///tuning/{study_name}.db"
     study = optuna.create_study(
