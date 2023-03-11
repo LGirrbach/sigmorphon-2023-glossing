@@ -33,7 +33,7 @@ if __name__ == '__main__':
         "Uspanteko": "usp"
     }
 
-    language = "Arapaho"
+    language = "Lezgi"
     track = 1
     language_code = language_code_mapping[language]
 

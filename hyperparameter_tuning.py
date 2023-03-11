@@ -48,6 +48,10 @@ def hyperparameter_tuning(base_path: str, data_path: str, language: str, track: 
     # Setup Optuna
     os.makedirs("./tuning", exist_ok=True)
     study_name = f"glossing_tuning={language}-track{track}-{model_type}"
+    # Skip if exists
+    if os.path.exists(f"./tuning/{study_name}.csv"):
+        return
+
     storage_name = f"sqlite:///tuning/{study_name}.db"
     study = optuna.create_study(
         study_name=study_name, storage=storage_name, direction="maximize"

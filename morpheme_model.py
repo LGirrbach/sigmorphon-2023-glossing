@@ -78,6 +78,7 @@ class MorphemeGlossingModel(LightningModule):
         num_morpheme_scores = self.num_morpheme_classifier(word_encodings)
         num_morpheme_predictions = torch.argmax(num_morpheme_scores, dim=-1)
         num_morpheme_predictions = torch.minimum(num_morpheme_predictions, word_lengths)
+        num_morpheme_predictions = torch.clip(num_morpheme_predictions, min=1)
 
         return {
             "scores": num_morpheme_scores,
