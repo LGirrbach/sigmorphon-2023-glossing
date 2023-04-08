@@ -29,10 +29,11 @@ model_type_mapping = {
 }
 
 
-def _make_experiment_name(language: str, track: int, model_type: str, hyperparameters: Hyperparameters):
+def _make_experiment_name(language: str, track: int, model_type: str, hyperparameters: Hyperparameters, trial: int):
     experiment_name = language_code_mapping[language]
     experiment_name = experiment_name + "-" + f"track{track}"
     experiment_name = experiment_name + "-" + f"model={model_type}"
+    experiment_name = experiment_name + "-" + f"trial={trial}"
 
     hyperparameter_str = "-".join([f"{param}={value}" for param, value in hyperparameters._asdict().items()])
     experiment_name = experiment_name + "-" + hyperparameter_str
@@ -107,7 +108,7 @@ def _make_model(model_type: str, dataset: GlossingDataset, track: int, hyperpara
 
 
 def experiment(base_path: str, language: str, track: int, model_type: str, hyperparameters: Hyperparameters,
-               data_path: str = "./data", verbose: bool = False):
+               data_path: str = "./data", verbose: bool = False, trial: int = 0):
     # Global Settings
     torch.set_float32_matmul_precision('medium')
     logging.disable(logging.WARNING)
@@ -116,11 +117,13 @@ def experiment(base_path: str, language: str, track: int, model_type: str, hyper
     _check_arguments(language, track, model_type, data_path, hyperparameters)
 
     # Make Experiment Name and Base Path
-    experiment_name = _make_experiment_name(language, track, model_type, hyperparameters)
+    experiment_name = _make_experiment_name(language, track, model_type, hyperparameters, trial)
     base_path = os.path.join(base_path, experiment_name)
 
     if os.path.exists(base_path):
         raise FileExistsError(f"Model Path {base_path} exists.")
+    else:
+        os.makedirs(base_path, exist_ok=True)
 
     # Prepare Data
     dm = _make_dataset(language, track, data_path, hyperparameters.batch_size)
