@@ -12,6 +12,7 @@ batch_size_boundaries = {
     "Arapaho": [16, 128],
     "Gitksan": [2, 16],
     "Lezgi": [2, 64],
+    "Natugu": [2, 64],
     "Nyangbo": [2, 64],
     "Tsez": [2, 64],
     "Uspanteko": [16, 128]
