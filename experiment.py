@@ -17,6 +17,7 @@ language_code_mapping = {
     "Arapaho": "arp",
     "Gitksan": "git",
     "Lezgi": "lez",
+    "Natugu": "ntu",
     "Nyangbo": "nyb",
     "Tsez": "ddo",
     "Uspanteko": "usp"
@@ -106,7 +107,7 @@ def _make_model(model_type: str, dataset: GlossingDataset, track: int, hyperpara
 
 
 def experiment(base_path: str, language: str, track: int, model_type: str, hyperparameters: Hyperparameters,
-               data_path: str = "./data"):
+               data_path: str = "./data", verbose: bool = False):
     # Global Settings
     torch.set_float32_matmul_precision('medium')
     logging.disable(logging.WARNING)
@@ -152,8 +153,8 @@ def experiment(base_path: str, language: str, track: int, model_type: str, hyper
 
     # Train Model
     trainer = Trainer(
-        accelerator="gpu", devices=1, gradient_clip_val=1.0, max_epochs=100, enable_progress_bar=False,
-        log_every_n_steps=1, logger=logger, check_val_every_n_epoch=1,
+        accelerator="gpu", devices=1, gradient_clip_val=1.0, max_epochs=100, enable_progress_bar=verbose,
+        log_every_n_steps=1, logger=logger, check_val_every_n_epoch=1, enable_model_summary=verbose,
         callbacks=[early_stopping_callback, checkpoint_callback], min_epochs=1
     )
     trainer.fit(model, dm)
@@ -165,4 +166,7 @@ def experiment(base_path: str, language: str, track: int, model_type: str, hyper
 
 if __name__ == '__main__':
     hparams = Hyperparameters(batch_size=2, num_layers=1, hidden_size=512, dropout=0.1, scheduler_gamma=1.0)
-    experiment(base_path="./results", language="Gitksan", track=1, model_type="ctc", hyperparameters=hparams)
+    res = experiment(
+        base_path="./results", language="Natugu", track=1, model_type="morph", hyperparameters=hparams, verbose=True
+    )
+    print(res)

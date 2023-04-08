@@ -34,7 +34,7 @@ if __name__ == '__main__':
     }
 
     language = "Lezgi"
-    track = 1
+    track = 2
     language_code = language_code_mapping[language]
 
     train_file = f"./data/{language}/{language_code}-train-track{track}-uncovered"
