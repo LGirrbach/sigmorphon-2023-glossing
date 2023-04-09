@@ -67,10 +67,14 @@ def _make_dev_path_covered(language: str, track: int, data_path: str) -> str:
     return os.path.join(data_path, f"{language}/{language_code}-dev-track{track}-covered")
 
 
+def _make_test_path(language: str, track: int, data_path: str) -> str:
+    return _make_dev_path_covered(language, track, data_path)
+
+
 def _make_dataset(language: str, track: int, data_path: str, batch_size: int) -> GlossingDataset:
     train_file = _make_train_path(language, track, data_path)
     validation_file = _make_dev_path_uncovered(language, track, data_path)
-    test_file = _make_dev_path_uncovered(language, track, data_path)
+    test_file = _make_test_path(language, track, data_path)
 
     dm = GlossingDataset(
         train_file=train_file,
