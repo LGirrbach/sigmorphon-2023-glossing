@@ -12,6 +12,7 @@ language_code_mapping = {
     "Arapaho": "arp",
     "Gitksan": "git",
     "Lezgi": "lez",
+    "Natugu": "ntu",
     "Nyangbo": "nyb",
     "Tsez": "ddo",
     "Uspanteko": "usp"
@@ -71,15 +72,15 @@ def write_predictions(predictions, language_code: str, track: int, model_type: s
                     pf.write(line)
                 else:
                     prediction, segmentation = next(predictions_iterator)
-                    # if segmentation is not None:
-                    #    pf.write("\\m " + segmentation + "\n")
+                    if segmentation is not None:
+                        pf.write("\\m " + segmentation + "\n")
                     pf.write("\\g " + prediction + "\n")
 
 
 def get_predictions(path_to_model: str, language: str, track: int, model_type: str, data_path: str = "./data",
                     verbose: bool = False):
     # Load Data
-    dm = _make_dataset(language, track, data_path, 64)
+    dm = _make_dataset(language, track, data_path, 16)
     dm.prepare_data()
     dm.setup(stage="fit")
     dm.setup(stage="test")
@@ -94,9 +95,7 @@ def get_predictions(path_to_model: str, language: str, track: int, model_type: s
 
     # Create Trainer
     # Train Model
-    trainer = Trainer(
-        accelerator="cpu", devices=1, enable_progress_bar=verbose, enable_model_summary=verbose, logger=False
-    )
+    trainer = Trainer(accelerator="cpu", devices=1, enable_progress_bar=True, enable_model_summary=verbose, logger=False)
 
     # Get predictions
     predictions = trainer.predict(model=model, dataloaders=dm.test_dataloader())
@@ -115,7 +114,7 @@ def parse_model_name(model_name: str):
 
 
 def get_predictions_from_retrained_models(base_path: str = "./retrain_results"):
-    for retrained_model in tqdm(os.listdir(base_path)):
+    for retrained_model in os.listdir(base_path):
         language_code, track, model_type, trial = parse_model_name(retrained_model)
 
         path_to_saved_models = os.path.join(base_path, retrained_model, "saved_models")
