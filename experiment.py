@@ -68,7 +68,8 @@ def _make_dev_path_covered(language: str, track: int, data_path: str) -> str:
 
 
 def _make_test_path(language: str, track: int, data_path: str) -> str:
-    return _make_dev_path_covered(language, track, data_path)
+    language_code = language_code_mapping[language]
+    return os.path.join(data_path, f"{language}/{language_code}-test-track{track}-covered")
 
 
 def _make_dataset(language: str, track: int, data_path: str, batch_size: int) -> GlossingDataset:
