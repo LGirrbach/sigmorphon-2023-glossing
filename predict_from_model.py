@@ -72,8 +72,8 @@ def write_predictions(predictions, language_code: str, track: int, model_type: s
                     pf.write(line)
                 else:
                     prediction, segmentation = next(predictions_iterator)
-                    if segmentation is not None:
-                        pf.write("\\m " + segmentation + "\n")
+                    # if segmentation is not None:
+                    #    pf.write("\\m " + segmentation + "\n")
                     pf.write("\\g " + prediction + "\n")
 
 
@@ -95,7 +95,9 @@ def get_predictions(path_to_model: str, language: str, track: int, model_type: s
 
     # Create Trainer
     # Train Model
-    trainer = Trainer(accelerator="cpu", devices=1, enable_progress_bar=True, enable_model_summary=verbose, logger=False)
+    trainer = Trainer(
+        accelerator="cpu", devices=1, enable_progress_bar=True, enable_model_summary=verbose, logger=False
+    )
 
     # Get predictions
     predictions = trainer.predict(model=model, dataloaders=dm.test_dataloader())
