@@ -1,4 +1,4 @@
-# Tü-CL at SIGMORPHON 2023: Straight-Through Gradient Estimation for Hard Attention (Morpheme Segmentation)
+# Tü-CL at SIGMORPHON 2023: Straight-Through Gradient Estimation for Hard Attention
 ## Introduction
 
 This repository contains code accompanying our system description paper [Tü-CL at SIGMORPHON 2023: Straight-Through Gradient Estimation for Hard Attention](https://aclanthology.org/2023.sigmorphon-1.17/) for the [Interlinear Glossing shared task](https://aclanthology.org/2023.sigmorphon-1.20/).
