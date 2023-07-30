@@ -44,7 +44,7 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
         # Convert Ordinal Indices to One-Hot Representations
         # e.g. [1, 4] -> [0, 1, 0, 0, 1, 0, 0] corresponds to 3 morphemes
         best_separators_one_hot = torch.zeros(
-            num_words, num_chars+1, dtype=torch.long, device=scores.device
+            num_words, num_chars + 1, dtype=torch.long, device=scores.device
         )
         best_separators_one_hot = torch.scatter(
             best_separators_one_hot, dim=1, index=best_separator_indices, value=1
@@ -59,12 +59,16 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
         # Mask Padding Characters (Avoid Appending to Last Morpheme)
         best_path_mask = make_mask_3d(word_lengths, num_morphemes)
         best_path_matrix = one_hot(character_to_morpheme, num_classes=max_num_morphemes)
-        best_path_matrix = torch.masked_fill(best_path_matrix, mask=best_path_mask, value=0)
+        best_path_matrix = torch.masked_fill(
+            best_path_matrix, mask=best_path_mask, value=0
+        )
         best_path_matrix = best_path_matrix.bool()
 
         return best_path_matrix, best_separators_one_hot
 
-    def get_marginals(self, scores: Tensor, word_lengths: Tensor, num_morphemes: Tensor):
+    def get_marginals(
+        self, scores: Tensor, word_lengths: Tensor, num_morphemes: Tensor
+    ):
         batch_size = scores.shape[0]
         max_num_chars = scores.shape[1]
         max_num_morphemes = torch.max(num_morphemes).cpu().item()
@@ -77,12 +81,16 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
         # Beta Prior defines where to Start Calculation of Beta Scores
         # (Needed for Batch Vectorisation)
         beta_prior = torch.full(
-            (batch_size, max_num_chars, max_num_morphemes), fill_value=self.neg_inf_val, device=scores.device
+            (batch_size, max_num_chars, max_num_morphemes),
+            fill_value=self.neg_inf_val,
+            device=scores.device,
         )
-        beta_prior[torch.arange(batch_size), word_lengths - 1, num_morphemes - 1] = 0.
+        beta_prior[torch.arange(batch_size), word_lengths - 1, num_morphemes - 1] = 0.0
 
         # Helpers for Padding Alpha and Beta Scores
-        padding = torch.full((batch_size, 1), fill_value=self.neg_inf_val, device=scores.device)
+        padding = torch.full(
+            (batch_size, 1), fill_value=self.neg_inf_val, device=scores.device
+        )
 
         def pad_left(score_row: Tensor):
             return torch.cat([padding, score_row[:, :-1]], dim=1)
@@ -92,24 +100,36 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
 
         # Forward-Backward Algorithm
         # Compute Alpha (Forward Scores)
-        alpha = [torch.full((batch_size, max_num_morphemes), fill_value=self.neg_inf_val, device=scores.device)]
-        alpha[0][:, 0] = 0.
+        alpha = [
+            torch.full(
+                (batch_size, max_num_morphemes),
+                fill_value=self.neg_inf_val,
+                device=scores.device,
+            )
+        ]
+        alpha[0][:, 0] = 0.0
 
         for t in range(max_num_chars - 1):
             prev_alpha = alpha[-1]
-            alpha_t_stay = prev_alpha + log_one_minus_sigmoid[:, t:t+1]
-            alpha_t_shift = pad_left(prev_alpha) + log_sigmoid[:, t:t+1]
+            alpha_t_stay = prev_alpha + log_one_minus_sigmoid[:, t : t + 1]
+            alpha_t_shift = pad_left(prev_alpha) + log_sigmoid[:, t : t + 1]
             alpha_t = torch.logaddexp(alpha_t_stay, alpha_t_shift)
             alpha.append(alpha_t)
 
         # Compute Beta (Backward Scores)
-        beta = [torch.full((batch_size, max_num_morphemes), fill_value=self.neg_inf_val, device=scores.device)]
+        beta = [
+            torch.full(
+                (batch_size, max_num_morphemes),
+                fill_value=self.neg_inf_val,
+                device=scores.device,
+            )
+        ]
 
         for t in range(max_num_chars):
             t = max_num_chars - 1 - t
             next_beta = beta[0]
-            beta_t_stay = next_beta + log_one_minus_sigmoid[:, t:t+1]
-            beta_t_shift = pad_right(next_beta) + log_sigmoid[:, t:t+1]
+            beta_t_stay = next_beta + log_one_minus_sigmoid[:, t : t + 1]
+            beta_t_shift = pad_right(next_beta) + log_sigmoid[:, t : t + 1]
             beta_t = torch.logaddexp(beta_t_stay, beta_t_shift)
             beta_t = torch.logaddexp(beta_t, beta_prior[:, t])
             beta.insert(0, beta_t)
@@ -117,7 +137,7 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
         # Compute Marginals
         alpha = torch.stack(alpha, dim=1)
         beta = torch.stack(beta[:-1], dim=1)
-        z = alpha[torch.arange(batch_size), word_lengths-1, num_morphemes-1]
+        z = alpha[torch.arange(batch_size), word_lengths - 1, num_morphemes - 1]
         z = z.reshape(batch_size, 1, 1)
 
         marginal_mask = make_mask_3d(word_lengths, num_morphemes)
@@ -126,37 +146,54 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
 
         return marginals
 
-    def _select_relevant_morphemes(self, morpheme_encodings: Tensor, num_morphemes: Tensor) -> Tensor:
+    def _select_relevant_morphemes(
+        self, morpheme_encodings: Tensor, num_morphemes: Tensor
+    ) -> Tensor:
         """Select Morphemes that do not correspond to Padding"""
         morpheme_encodings = morpheme_encodings.reshape(-1, self.hidden_size)
         morpheme_mask = make_mask_2d(num_morphemes).flatten()
         morpheme_mask = torch.logical_not(morpheme_mask)
-        all_morpheme_indices = torch.arange(morpheme_encodings.shape[0], device=morpheme_mask.device)
+        all_morpheme_indices = torch.arange(
+            morpheme_encodings.shape[0], device=morpheme_mask.device
+        )
         morpheme_indices = torch.masked_select(all_morpheme_indices, mask=morpheme_mask)
-        morpheme_encodings = torch.index_select(morpheme_encodings, index=morpheme_indices, dim=0)
+        morpheme_encodings = torch.index_select(
+            morpheme_encodings, index=morpheme_indices, dim=0
+        )
         return morpheme_encodings
 
-    def forward(self, word_encodings: Tensor, word_lengths: Tensor, num_morphemes: Tensor = None,
-                training: bool = False):
+    def forward(
+        self,
+        word_encodings: Tensor,
+        word_lengths: Tensor,
+        num_morphemes: Tensor = None,
+        training: bool = False,
+    ):
         # word_encodings: shape [#words x #chars x features]
         batch_size = word_encodings.shape[0]
         max_num_chars = word_encodings.shape[1]
 
         # Compute Morpheme End Scores
         score_mask = torch.ones(batch_size, max_num_chars, dtype=torch.bool)
-        score_mask[:, :max_num_chars-1] = make_mask_2d(word_lengths-1)
+        score_mask[:, : max_num_chars - 1] = make_mask_2d(word_lengths - 1)
         score_mask = score_mask.to(word_encodings.device)
 
         morpheme_end_scores = self.morpheme_end_classifier(word_encodings).squeeze(2)
 
         # Add Gaussian Noise to Push Scores towards Discreteness
         if training:
-            morpheme_end_scores = morpheme_end_scores + torch.randn_like(morpheme_end_scores)
+            morpheme_end_scores = morpheme_end_scores + torch.randn_like(
+                morpheme_end_scores
+            )
 
-        morpheme_end_scores = torch.masked_fill(morpheme_end_scores, score_mask, value=self.neg_inf_val)
+        morpheme_end_scores = torch.masked_fill(
+            morpheme_end_scores, score_mask, value=self.neg_inf_val
+        )
 
         # Get Best Scores
-        best_path_matrix, _ = self.get_best_paths(morpheme_end_scores, word_lengths, num_morphemes)
+        best_path_matrix, _ = self.get_best_paths(
+            morpheme_end_scores, word_lengths, num_morphemes
+        )
         best_path_matrix = best_path_matrix.to(morpheme_end_scores.device)
         # best_path_matrix: shape [#words x #chars x #morphemes]
 
@@ -165,7 +202,9 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
             word_encodings = word_encodings.transpose(1, 2)
             morpheme_encodings = torch.bmm(word_encodings, best_path_matrix.float())
             morpheme_encodings = morpheme_encodings.transpose(1, 2)
-            morpheme_encodings = self._select_relevant_morphemes(morpheme_encodings, num_morphemes)
+            morpheme_encodings = self._select_relevant_morphemes(
+                morpheme_encodings, num_morphemes
+            )
             return morpheme_encodings, best_path_matrix
 
         # Get Marginals
@@ -180,7 +219,7 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
         # morpheme_encodings: shape [#words x #morphemes x features]
 
         # Compute Residuals
-        residual_scores = torch.where(best_path_matrix, marginals - 1., marginals)
+        residual_scores = torch.where(best_path_matrix, marginals - 1.0, marginals)
         residuals = torch.bmm(word_encodings, residual_scores)
         residuals = residuals.transpose(1, 2)
         residuals = residuals.detach()
@@ -189,5 +228,7 @@ class UnsupervisedMorphemeSegmenter(nn.Module):
         morpheme_encodings = morpheme_encodings - residuals
 
         # Select Relevant Morphemes
-        morpheme_encodings = self._select_relevant_morphemes(morpheme_encodings, num_morphemes)
+        morpheme_encodings = self._select_relevant_morphemes(
+            morpheme_encodings, num_morphemes
+        )
         return morpheme_encodings, best_path_matrix

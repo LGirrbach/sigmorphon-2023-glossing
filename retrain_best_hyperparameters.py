@@ -4,11 +4,9 @@ import argparse
 from experiment import experiment
 from containers import Hyperparameters
 
-languages = [
-    "Arapaho", "Gitksan", "Lezgi", "Natugu", "Nyangbo", "Tsez", "Uspanteko"
-]
+languages = ["Arapaho", "Gitksan", "Lezgi", "Natugu", "Nyangbo", "Tsez", "Uspanteko"]
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser("Retrain Models with Best Hyperparameters")
     parser.add_argument("--basepath", default="./retrain_results")
     parser.add_argument("--datapath", default="./data")
@@ -16,7 +14,7 @@ if __name__ == '__main__':
     parser.add_argument("--track", type=int, choices=[1, 2])
     parser.add_argument("--model", type=str, choices=["ctc", "morph"])
     parser.add_argument("--trial", type=int, default=1)
-    parser.add_argument("--verbose", action='store_true')
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
     language = args.language
@@ -31,7 +29,7 @@ if __name__ == '__main__':
             num_layers=int(hyperparameters["num_layers"]),
             hidden_size=int(hyperparameters["hidden_size"]),
             dropout=hyperparameters["dropout"],
-            scheduler_gamma=hyperparameters["scheduler_gamma"]
+            scheduler_gamma=hyperparameters["scheduler_gamma"],
         )
 
     experiment(
@@ -42,5 +40,5 @@ if __name__ == '__main__':
         hyperparameters=hyperparameters,
         data_path=args.datapath,
         verbose=args.verbose,
-        trial=args.trial
+        trial=args.trial,
     )

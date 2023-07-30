@@ -15,12 +15,18 @@ batch_size_boundaries = {
     "Natugu": [2, 64],
     "Nyangbo": [2, 64],
     "Tsez": [2, 64],
-    "Uspanteko": [16, 128]
+    "Uspanteko": [16, 128],
 }
 
 
-def hyperparameter_tuning(base_path: str, data_path: str, language: str, track: int, model_type: str,
-                          num_trials: int = 1):
+def hyperparameter_tuning(
+    base_path: str,
+    data_path: str,
+    language: str,
+    track: int,
+    model_type: str,
+    num_trials: int = 1,
+):
     batch_size_lower_bound = batch_size_boundaries[language][0]
     batch_size_upper_bound = batch_size_boundaries[language][1]
 
@@ -38,12 +44,19 @@ def hyperparameter_tuning(base_path: str, data_path: str, language: str, track: 
         )
 
         hyperparameters = Hyperparameters(
-            batch_size=batch_size, num_layers=num_layers, hidden_size=hidden_size, dropout=dropout,
-            scheduler_gamma=scheduler_gamma
+            batch_size=batch_size,
+            num_layers=num_layers,
+            hidden_size=hidden_size,
+            dropout=dropout,
+            scheduler_gamma=scheduler_gamma,
         )
         return experiment(
-            base_path=base_path, data_path=data_path, language=language, track=track, model_type=model_type,
-            hyperparameters=hyperparameters
+            base_path=base_path,
+            data_path=data_path,
+            language=language,
+            track=track,
+            model_type=model_type,
+            hyperparameters=hyperparameters,
         )
 
     # Setup Optuna
@@ -65,17 +78,23 @@ def hyperparameter_tuning(base_path: str, data_path: str, language: str, track: 
     df.to_csv(f"./tuning/{study_name}.csv")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser("Hyperparameter Tuning")
     parser.add_argument("--basepath", default="./results")
     parser.add_argument("--datapath", default="./data")
-    parser.add_argument("--language", choices=list(batch_size_boundaries.keys()), type=str)
+    parser.add_argument(
+        "--language", choices=list(batch_size_boundaries.keys()), type=str
+    )
     parser.add_argument("--track", type=int, choices=[1, 2])
     parser.add_argument("--model", type=str, choices=["ctc", "morph"])
     parser.add_argument("--trials", type=int)
     args = parser.parse_args()
 
     hyperparameter_tuning(
-        base_path=args.basepath, data_path=args.datapath, language=args.language, track=args.track,
-        model_type=args.model, num_trials=args.trials
+        base_path=args.basepath,
+        data_path=args.datapath,
+        language=args.language,
+        track=args.track,
+        model_type=args.model,
+        num_trials=args.trials,
     )

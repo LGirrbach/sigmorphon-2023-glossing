@@ -1,6 +1,7 @@
 import os
 import torch
 import shutil
+import argparse
 import pandas as pd
 
 from data import GlossingDataset
@@ -11,30 +12,71 @@ from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-torch.set_float32_matmul_precision('medium')
+language_code_mapping = {
+    "Arapaho": "arp",
+    "Gitksan": "git",
+    "Lezgi": "lez",
+    "Natugu": "ntu",
+    "Nyangbo": "nyb",
+    "Tsez": "ddo",
+    "Uspanteko": "usp",
+}
 
-if __name__ == '__main__':
-    name = "glossing_test"
+
+def make_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser("Glossing Model")
+    parser.add_argument("--model", type=str, default="morph", choices=["ctc", "morph"])
+    parser.add_argument(
+        "--language",
+        type=str,
+        required=True,
+        choices=list(language_code_mapping.keys()),
+    )
+    parser.add_argument("--track", type=int, required=True, choices=[1, 2])
+    parser.add_argument("--layers", type=int, default=1)
+    parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--hidden", type=int, default=512)
+    parser.add_argument("--gamma", type=float, default=0.98)
+    parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--epochs", type=int, default=25)
+
+    args = parser.parse_args()
+    return args
+
+
+if __name__ == "__main__":
+    # Set torch matmul precision
+    torch.set_float32_matmul_precision("high")
+
+    # Parse arguments
+    args = make_argument_parser()
+
+    # Make experiment name
+    name = f"glossing_{args.model}_{args.language}_{args.track}"
+
+    # Make experiment directory
     shutil.rmtree("./results", ignore_errors=True)
     base_path = os.path.join("./results/", name)
+    os.makedirs(base_path, exist_ok=True)
+
+    # Make logger and callbacks
     logger = pl_loggers.CSVLogger(save_dir=os.path.join(base_path, "logs"), name=name)
     checkpoint_callback = ModelCheckpoint(
-        dirpath=os.path.join(base_path, "saved_models"), filename=name + "-{val_accuracy}", monitor="val_accuracy",
-        save_last=True, save_top_k=1, mode="max", verbose=True
+        dirpath=os.path.join(base_path, "saved_models"),
+        filename=name + "-{val_accuracy}",
+        monitor="val_accuracy",
+        save_last=True,
+        save_top_k=1,
+        mode="max",
+        verbose=True,
     )
-    early_stopping_callback = EarlyStopping(monitor="val_accuracy", patience=3, mode="max", verbose=True)
+    early_stopping_callback = EarlyStopping(
+        monitor="val_accuracy", patience=3, mode="max", verbose=True
+    )
 
-    language_code_mapping = {
-        "Arapaho": "arp",
-        "Gitksan": "git",
-        "Lezgi": "lez",
-        "Nyangbo": "nyb",
-        "Tsez": "ddo",
-        "Uspanteko": "usp"
-    }
-
-    language = "Lezgi"
-    track = 2
+    # Load data
+    language = args.language
+    track = args.track
     language_code = language_code_mapping[language]
 
     train_file = f"./data/{language}/{language_code}-train-track{track}-uncovered"
@@ -45,29 +87,60 @@ if __name__ == '__main__':
         train_file=train_file,
         validation_file=validation_file,
         test_file=test_file,
-        batch_size=22
+        batch_size=args.batch,
     )
 
     dm.prepare_data()
     dm.setup(stage="fit")
 
-    model = MorphemeGlossingModel(
-        source_alphabet_size=dm.source_alphabet_size, target_alphabet_size=dm.target_alphabet_size,
-        num_layers=1, dropout=0.42, hidden_size=496, scheduler_gamma=0.98,
-        learn_segmentation=(track == 1), classify_num_morphemes=(track == 1)
-    )
+    # Make model and trainer
+    if args.model == "ctc":
+        model = CTCGlossingModel(
+            source_alphabet_size=dm.source_alphabet_size,
+            target_alphabet_size=dm.target_alphabet_size,
+            num_layers=args.layers,
+            dropout=args.dropout,
+            hidden_size=args.hidden,
+            scheduler_gamma=args.gamma,
+        )
+    elif args.model == "morph":
+        model = MorphemeGlossingModel(
+            source_alphabet_size=dm.source_alphabet_size,
+            target_alphabet_size=dm.target_alphabet_size,
+            num_layers=args.layers,
+            dropout=args.dropout,
+            hidden_size=args.hidden,
+            scheduler_gamma=args.gamma,
+            learn_segmentation=(track == 1),
+            classify_num_morphemes=(track == 1),
+        )
+
     trainer = Trainer(
-        accelerator="gpu", devices=1, gradient_clip_val=1.0, max_epochs=25, enable_progress_bar=True,
-        log_every_n_steps=10, logger=logger, check_val_every_n_epoch=1,
-        callbacks=[early_stopping_callback, checkpoint_callback], min_epochs=1
+        accelerator="gpu",
+        devices=1,
+        gradient_clip_val=1.0,
+        max_epochs=args.epochs,
+        enable_progress_bar=True,
+        log_every_n_steps=10,
+        logger=logger,
+        check_val_every_n_epoch=1,
+        callbacks=[early_stopping_callback, checkpoint_callback],
+        min_epochs=1,
     )
 
+    # Train model
     trainer.fit(model, dm)
-    model.load_from_checkpoint(checkpoint_path=os.path.join(base_path, "saved_models", "last.ckpt"))
+    # Load best model
+    model.load_from_checkpoint(
+        checkpoint_path=os.path.join(base_path, "saved_models", "last.ckpt")
+    )
 
-    logs = pd.read_csv(os.path.join(base_path, "logs", name, "version_0", "metrics.csv"))
+    # Load logs
+    logs = pd.read_csv(
+        os.path.join(base_path, "logs", name, "version_0", "metrics.csv")
+    )
     best_val_accuracy = logs["val_accuracy"].max()
-    print(best_val_accuracy)
+    print(f"Best validation accuracy: {100 * best_val_accuracy:.2f}")
 
     # Get Predictions
     dm.setup(stage="test")
@@ -84,28 +157,44 @@ if __name__ == '__main__':
             sentence_segmentations.extend([None for _ in batch_prediction])
 
     decoded_predictions = []
-    for sentence_prediction, sentence_segmentation in zip(sentence_predictions, sentence_segmentations):
+    for sentence_prediction, sentence_segmentation in zip(
+        sentence_predictions, sentence_segmentations
+    ):
         decoded_sentence_prediction = [
-            dm.target_tokenizer.lookup_tokens(word_predictions) for word_predictions in sentence_prediction
+            dm.target_tokenizer.lookup_tokens(word_predictions)
+            for word_predictions in sentence_prediction
         ]
-        decoded_sentence_prediction = ["-".join(word_predictions) for word_predictions in decoded_sentence_prediction]
+        decoded_sentence_prediction = [
+            "-".join(word_predictions)
+            for word_predictions in decoded_sentence_prediction
+        ]
         decoded_sentence_prediction = " ".join(decoded_sentence_prediction)
 
         if sentence_segmentation is not None:
             decoded_sentence_segmentation = [
-                ["".join(dm.source_tokenizer.lookup_tokens(morpheme_indices)) for morpheme_indices in token_indices]
+                [
+                    "".join(dm.source_tokenizer.lookup_tokens(morpheme_indices))
+                    for morpheme_indices in token_indices
+                ]
                 for token_indices in sentence_segmentation
             ]
-            decoded_sentence_segmentation = ["-".join(morphemes) for morphemes in decoded_sentence_segmentation]
+            decoded_sentence_segmentation = [
+                "-".join(morphemes) for morphemes in decoded_sentence_segmentation
+            ]
             decoded_sentence_segmentation = " ".join(decoded_sentence_segmentation)
         else:
             decoded_sentence_segmentation = None
 
-        decoded_predictions.append((decoded_sentence_prediction, decoded_sentence_segmentation))
+        decoded_predictions.append(
+            (decoded_sentence_prediction, decoded_sentence_segmentation)
+        )
 
     predictions_iterator = iter(decoded_predictions)
 
-    with open(f"{language_code}_track{track}.prediction", "w") as pf:
+    # Write predictions
+    with open(
+        f"{args.language.lower()}_{args.model}_track{track}.prediction", "w"
+    ) as pf:
         with open(test_file) as tf:
             for line in tf:
                 if not line.startswith("\\g"):

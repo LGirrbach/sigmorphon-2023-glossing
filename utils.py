@@ -18,7 +18,11 @@ def make_mask_2d(lengths: torch.Tensor):
     assert len(lengths.shape) == 1
 
     max_length = torch.amax(lengths, dim=0).item()
-    mask = torch.arange(max_length).to(lengths.device).expand((lengths.shape[0], max_length))
+    mask = (
+        torch.arange(max_length)
+        .to(lengths.device)
+        .expand((lengths.shape[0], max_length))
+    )
     # Shape batch x timesteps
     mask = torch.ge(mask, lengths.unsqueeze(1))
 
@@ -32,8 +36,8 @@ def make_mask_3d(source_lengths: torch.Tensor, target_lengths: torch.Tensor):
     """
     # Calculate binary masks for source and target
     # Then invert boolean values and convert to float (necessary for bmm later)
-    source_mask = (~ make_mask_2d(source_lengths)).float()
-    target_mask = (~ make_mask_2d(target_lengths)).float()
+    source_mask = (~make_mask_2d(source_lengths)).float()
+    target_mask = (~make_mask_2d(target_lengths)).float()
 
     # Add dummy dimensions for bmm
     source_mask = source_mask.unsqueeze(2)

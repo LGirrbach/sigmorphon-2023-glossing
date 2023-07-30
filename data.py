@@ -24,7 +24,11 @@ def _make_empty_datapoint() -> RawDatapoint:
 
 
 def _check_datapoint(datapoint: RawDatapoint) -> bool:
-    source, target, morphemes = datapoint["source"], datapoint["target"], datapoint["morphemes"]
+    source, target, morphemes = (
+        datapoint["source"],
+        datapoint["target"],
+        datapoint["morphemes"],
+    )
     if source is None:
         raise ValueError("Found Datapoint without Source.")
 
@@ -37,7 +41,9 @@ def _check_datapoint(datapoint: RawDatapoint) -> bool:
     if any(len(wls) == 0 for wls in target):
         return False
 
-    if morphemes is not None and any(len(ms) != len(wls) for ms, wls in zip(morphemes, target)):
+    if morphemes is not None and any(
+        len(ms) != len(wls) for ms, wls in zip(morphemes, target)
+    ):
         return False
 
     if any(len(wls) > len(word) for word, wls in zip(source, target)):
@@ -52,7 +58,7 @@ def _datapoint_is_empty(datapoint: RawDatapoint) -> bool:
 
 def read_glossing_file(file) -> GlossingFileData:
     track = 1 if "track1" in file else 2
-    covered = ("covered" in file and "uncovered" not in file)
+    covered = "covered" in file and "uncovered" not in file
 
     raw_datapoints = [_make_empty_datapoint()]
 
@@ -97,11 +103,15 @@ def read_glossing_file(file) -> GlossingFileData:
                 continue
 
     # Remove Empty Datapoints
-    raw_datapoints = [datapoint for datapoint in raw_datapoints if not _datapoint_is_empty(datapoint)]
+    raw_datapoints = [
+        datapoint for datapoint in raw_datapoints if not _datapoint_is_empty(datapoint)
+    ]
 
     # Remove Corrupted Datapoints
     if not covered:
-        raw_datapoints = [datapoint for datapoint in raw_datapoints if _check_datapoint(datapoint)]
+        raw_datapoints = [
+            datapoint for datapoint in raw_datapoints if _check_datapoint(datapoint)
+        ]
 
     # Check File Constraints
     if track == 2:
@@ -129,11 +139,15 @@ def read_glossing_file(file) -> GlossingFileData:
     return GlossingFileData(sources=sources, targets=targets, morphemes=morphemes)
 
 
-def _make_source_sentence(source: List[str], sos_token: str = "[SOS]", eos_token: str = "[EOS]") -> List[str]:
+def _make_source_sentence(
+    source: List[str], sos_token: str = "[SOS]", eos_token: str = "[EOS]"
+) -> List[str]:
     return [sos_token] + list(" ".join(source)) + [eos_token]
 
 
-def _make_word_extraction_index(sources: List[List[str]], maximum_sentence_length: int, start_offset: int = 1):
+def _make_word_extraction_index(
+    sources: List[List[str]], maximum_sentence_length: int, start_offset: int = 1
+):
     word_extraction_index = []
     word_lengths = []
     word_batch_mapping = []
@@ -160,30 +174,49 @@ def indices_to_tensor(indices: List[List[int]]) -> torch.Tensor:
     return nlp_pad_sequence([torch.tensor(idx).long() for idx in indices])
 
 
-def _batch_collate(batch, source_tokenizer: Vocab, target_tokenizer: Vocab, sos_token: str = "[SOS]",
-                   eos_token: str = "[EOS]"):
+def _batch_collate(
+    batch,
+    source_tokenizer: Vocab,
+    target_tokenizer: Vocab,
+    sos_token: str = "[SOS]",
+    eos_token: str = "[EOS]",
+):
     sources, targets, morphemes = zip(*batch)
 
     # Encode Source Sentences (character level)
-    make_source_sentence = partial(_make_source_sentence, sos_token=sos_token, eos_token=eos_token)
+    make_source_sentence = partial(
+        _make_source_sentence, sos_token=sos_token, eos_token=eos_token
+    )
     source_sentences = [make_source_sentence(source) for source in sources]
     source_sentences = [source_tokenizer(source) for source in source_sentences]
 
     source_sentence_tensors = indices_to_tensor(source_sentences)
-    source_sentence_lengths = torch.tensor([len(source) for source in source_sentences]).long()
+    source_sentence_lengths = torch.tensor(
+        [len(source) for source in source_sentences]
+    ).long()
 
     # Make Word Extraction Index
     maximum_sentence_length = source_sentence_tensors.shape[1]
-    word_extraction_index, word_lengths, word_batch_mapping =\
-        _make_word_extraction_index(sources=sources, maximum_sentence_length=maximum_sentence_length)
+    (
+        word_extraction_index,
+        word_lengths,
+        word_batch_mapping,
+    ) = _make_word_extraction_index(
+        sources=sources, maximum_sentence_length=maximum_sentence_length
+    )
 
     # Make Morpheme Extraction Index (In Case of Track 2)
     if all(ms is not None for ms in morphemes):
         maximum_word_length = max(word_lengths.tolist())
         morphemes_flat = list(chain.from_iterable(morphemes))
 
-        morpheme_extraction_index, morpheme_lengths, morpheme_word_mapping =\
-            _make_word_extraction_index(morphemes_flat, maximum_word_length, start_offset=0)
+        (
+            morpheme_extraction_index,
+            morpheme_lengths,
+            morpheme_word_mapping,
+        ) = _make_word_extraction_index(
+            morphemes_flat, maximum_word_length, start_offset=0
+        )
     else:
         morpheme_extraction_index = None
         morpheme_lengths = None
@@ -194,7 +227,9 @@ def _batch_collate(batch, source_tokenizer: Vocab, target_tokenizer: Vocab, sos_
         word_targets = list(chain.from_iterable(targets))
         word_targets = [target_tokenizer(target) for target in word_targets]
         word_target_tensors = indices_to_tensor(word_targets)
-        word_target_lengths = torch.tensor([len(target) for target in word_targets]).long()
+        word_target_lengths = torch.tensor(
+            [len(target) for target in word_targets]
+        ).long()
 
         # Make Morpheme Targets
         morpheme_targets = list(chain.from_iterable(word_targets))
@@ -206,11 +241,17 @@ def _batch_collate(batch, source_tokenizer: Vocab, target_tokenizer: Vocab, sos_
         morpheme_targets = None
 
     return Batch(
-        sentences=source_sentence_tensors, sentence_lengths=source_sentence_lengths,
-        word_lengths=word_lengths, word_extraction_index=word_extraction_index, word_batch_mapping=word_batch_mapping,
-        word_targets=word_target_tensors, word_target_lengths=word_target_lengths,
-        morpheme_extraction_index=morpheme_extraction_index, morpheme_lengths=morpheme_lengths,
-        morpheme_word_mapping=morpheme_word_mapping, morpheme_targets=morpheme_targets
+        sentences=source_sentence_tensors,
+        sentence_lengths=source_sentence_lengths,
+        word_lengths=word_lengths,
+        word_extraction_index=word_extraction_index,
+        word_batch_mapping=word_batch_mapping,
+        word_targets=word_target_tensors,
+        word_target_lengths=word_target_lengths,
+        morpheme_extraction_index=morpheme_extraction_index,
+        morpheme_lengths=morpheme_lengths,
+        morpheme_word_mapping=morpheme_word_mapping,
+        morpheme_targets=morpheme_targets,
     )
 
 
@@ -225,14 +266,26 @@ class SequencePairDataset(Dataset):
     def __len__(self) -> int:
         return self._length
 
-    def __getitem__(self, idx: int) -> Tuple[List[str], List[List[str]], List[List[str]]]:
-        return self.dataset.sources[idx], self.dataset.targets[idx], self.dataset.morphemes[idx]
+    def __getitem__(
+        self, idx: int
+    ) -> Tuple[List[str], List[List[str]], List[List[str]]]:
+        return (
+            self.dataset.sources[idx],
+            self.dataset.targets[idx],
+            self.dataset.morphemes[idx],
+        )
 
 
 class GlossingDataset(LightningDataModule):
     special_tokens = ["[PAD]", "[UNK]", "[SOS]", "[EOS]"]
 
-    def __init__(self, train_file: str, validation_file: str, test_file: str, batch_size: int = 32):
+    def __init__(
+        self,
+        train_file: str,
+        validation_file: str,
+        test_file: str,
+        batch_size: int = 32,
+    ):
         super().__init__()
         self.train_file = train_file
         self.validation_file = validation_file
@@ -265,16 +318,20 @@ class GlossingDataset(LightningDataModule):
             self.target_alphabet_size = len(self.target_alphabet) + 4
 
             self.source_tokenizer = build_vocab_from_iterator(
-                [[symbol] for symbol in self.source_alphabet], specials=self.special_tokens
+                [[symbol] for symbol in self.source_alphabet],
+                specials=self.special_tokens,
             )
             self.target_tokenizer = build_vocab_from_iterator(
-                [[symbol] for symbol in self.target_alphabet], specials=self.special_tokens
+                [[symbol] for symbol in self.target_alphabet],
+                specials=self.special_tokens,
             )
             self.source_tokenizer.set_default_index(1)
             self.target_tokenizer.set_default_index(1)
 
             self._batch_collate = partial(
-                _batch_collate, source_tokenizer=self.source_tokenizer, target_tokenizer=self.target_tokenizer
+                _batch_collate,
+                source_tokenizer=self.source_tokenizer,
+                target_tokenizer=self.target_tokenizer,
             )
 
         if stage == "test" or stage is None:
@@ -282,16 +339,27 @@ class GlossingDataset(LightningDataModule):
 
     def train_dataloader(self, shuffle: bool = True):
         return DataLoader(
-            self.train_data, batch_size=self.batch_size, shuffle=shuffle, collate_fn=self._batch_collate, num_workers=6
+            self.train_data,
+            batch_size=self.batch_size,
+            shuffle=shuffle,
+            collate_fn=self._batch_collate,
+            num_workers=6,
         )
 
     def val_dataloader(self):
         return DataLoader(
-            self.validation_data, batch_size=self.batch_size, shuffle=False, collate_fn=self._batch_collate,
-            num_workers=6
+            self.validation_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            collate_fn=self._batch_collate,
+            num_workers=6,
         )
 
     def test_dataloader(self):
         return DataLoader(
-            self.test_data, batch_size=self.batch_size, shuffle=False, collate_fn=self._batch_collate, num_workers=6
+            self.test_data,
+            batch_size=self.batch_size,
+            shuffle=False,
+            collate_fn=self._batch_collate,
+            num_workers=6,
         )

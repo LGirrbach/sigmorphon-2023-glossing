@@ -13,8 +13,16 @@ from torch.optim.lr_scheduler import ExponentialLR
 
 
 class CTCGlossingModel(LightningModule):
-    def __init__(self, source_alphabet_size: int, target_alphabet_size: int, hidden_size: int = 128,
-                 num_layers: int = 1, dropout: float = 0.0, embedding_size: int = 128, scheduler_gamma: float = 1.0):
+    def __init__(
+        self,
+        source_alphabet_size: int,
+        target_alphabet_size: int,
+        hidden_size: int = 128,
+        num_layers: int = 1,
+        dropout: float = 0.0,
+        embedding_size: int = 128,
+        scheduler_gamma: float = 1.0,
+    ):
         super().__init__()
         self.source_alphabet_size = source_alphabet_size
         self.target_alphabet_size = target_alphabet_size
@@ -27,11 +35,16 @@ class CTCGlossingModel(LightningModule):
         self.save_hyperparameters()
 
         self.embeddings = nn.Embedding(
-            num_embeddings=self.source_alphabet_size, embedding_dim=self.embedding_size, padding_idx=0
+            num_embeddings=self.source_alphabet_size,
+            embedding_dim=self.embedding_size,
+            padding_idx=0,
         )
         self.encoder = BiLSTMEncoder(
-            input_size=self.embedding_size, hidden_size=self.hidden_size, num_layers=self.num_layers,
-            dropout=self.dropout, projection_dim=self.hidden_size
+            input_size=self.embedding_size,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            dropout=self.dropout,
+            projection_dim=self.hidden_size,
         )
         self.classifier = nn.Linear(self.hidden_size, self.target_alphabet_size)
         self.ctc = nn.CTCLoss()
@@ -41,7 +54,9 @@ class CTCGlossingModel(LightningModule):
         scheduler = ExponentialLR(optimizer, gamma=self.scheduler_gamma)
         return [optimizer], [scheduler]
 
-    def get_prediction_scores(self, sentences: Tensor, sentence_lengths: Tensor, word_extraction_index: Tensor):
+    def get_prediction_scores(
+        self, sentences: Tensor, sentence_lengths: Tensor, word_extraction_index: Tensor
+    ):
         # Encode Sentences
         char_embeddings = self.embeddings(sentences)
         char_encodings = self.encoder(char_embeddings, sentence_lengths)
@@ -52,8 +67,12 @@ class CTCGlossingModel(LightningModule):
         # Make Word Extraction Index
         num_words, chars_per_word = word_extraction_index.shape
         word_extraction_index_flat = word_extraction_index.flatten()
-        word_prediction_scores = torch.index_select(char_predictions, dim=0, index=word_extraction_index_flat)
-        word_prediction_scores = word_prediction_scores.reshape(num_words, chars_per_word, self.target_alphabet_size)
+        word_prediction_scores = torch.index_select(
+            char_predictions, dim=0, index=word_extraction_index_flat
+        )
+        word_prediction_scores = word_prediction_scores.reshape(
+            num_words, chars_per_word, self.target_alphabet_size
+        )
 
         return word_prediction_scores
 
@@ -66,7 +85,9 @@ class CTCGlossingModel(LightningModule):
         log_probs = log_probs.transpose(0, 1)
 
         targets = batch.word_targets
-        loss = self.ctc(log_probs, targets, batch.word_lengths, batch.word_target_lengths)
+        loss = self.ctc(
+            log_probs, targets, batch.word_lengths, batch.word_target_lengths
+        )
         if torch.isinf(loss):
             return torch.tensor(0.0, requires_grad=True)
 
@@ -78,15 +99,23 @@ class CTCGlossingModel(LightningModule):
         )
         predicted_indices = torch.argmax(prediction_scores, dim=-1)
         prediction_mask = make_mask_2d(batch.word_lengths)
-        predicted_indices = torch.masked_fill(predicted_indices, mask=prediction_mask, value=0).long()
+        predicted_indices = torch.masked_fill(
+            predicted_indices, mask=prediction_mask, value=0
+        ).long()
 
         predicted_indices = predicted_indices.cpu().tolist()
-        predicted_indices = [[idx for idx in predictions if idx != 0] for predictions in predicted_indices]
+        predicted_indices = [
+            [idx for idx in predictions if idx != 0]
+            for predictions in predicted_indices
+        ]
 
         targets = batch.word_targets.cpu().tolist()
         targets = [[idx for idx in target if idx != 0] for target in targets]
 
-        correct = [prediction == target for prediction, target in zip(predicted_indices, targets)]
+        correct = [
+            prediction == target
+            for prediction, target in zip(predicted_indices, targets)
+        ]
         return correct
 
     def validation_step(self, batch: Batch, batch_idx: int):
@@ -104,13 +133,20 @@ class CTCGlossingModel(LightningModule):
         )
         predicted_indices = torch.argmax(prediction_scores, dim=-1)
         prediction_mask = make_mask_2d(batch.word_lengths)
-        predicted_indices = torch.masked_fill(predicted_indices, mask=prediction_mask, value=0).long()
+        predicted_indices = torch.masked_fill(
+            predicted_indices, mask=prediction_mask, value=0
+        ).long()
 
         predicted_indices = predicted_indices.cpu().tolist()
-        predicted_word_labels = [[idx for idx in predictions if idx != 0] for predictions in predicted_indices]
+        predicted_word_labels = [
+            [idx for idx in predictions if idx != 0]
+            for predictions in predicted_indices
+        ]
 
         predicted_sentence_labels = [[] for _ in range(batch.sentences.shape[0])]
-        for word_labels, sentence_idx in zip(predicted_word_labels, batch.word_batch_mapping):
+        for word_labels, sentence_idx in zip(
+            predicted_word_labels, batch.word_batch_mapping
+        ):
             predicted_sentence_labels[sentence_idx].append(word_labels)
 
         return predicted_sentence_labels, None
