@@ -10,7 +10,7 @@ The segmentation model is in [morpheme_segmenter.py](morpheme_segmenter.py).
 ## Setup
 Create a virtual environment, e.g. by using [Anaconda](https://docs.conda.io/en/latest/miniconda.html):
 ```
-conda create -n glossing python=3.11.4 pip
+conda create -n glossing python=3.9 pip
 ```
 Activate the environment:
 ```
@@ -19,6 +19,54 @@ conda activate glossing
 And finally install the dependencies in [requirements.txt]:
 ```
 pip install -r requirements.txt
+```
+
+## Train a model
+To train a single model, run
+```
+python main.py --language LANGUAGE --model MODEL --track TRACK
+```
+Only languages in the shared task dataset are supported. `MODEL` can be `ctc` for the BiLSTM with CTC loss baseline, or `morph` for the joint segmentation and glossing model. `TRACK` can be `1` for the closed track and `2` for the open track. For further hyperparameters, run
+```
+python main.py --help
+```
+
+The above script creates a file with the test set predictions in the current directory.
+
+## Hyperparameter tuning
+To obtain best hyperparameters, you can use the script [hyperparameter_tuning.py](hyperparameter_tuning.py):
+```
+python hyperparameter_tuning.py \
+    --language LANGUAGE \
+    --model MODEL \
+    --track TRACK \
+    --trials TRIALS
+```
+Trials specifies the number of evaluated hyperparameter combinations. We used 50 for obtaining the hyperparameters provided in the file [best_hyperparameters.json](best_hyperparameters.json), which is included in this repository.
+
+To retrain all models with our best hyperparameters, run
+```
+python retrain_best_hyperparameters.py
+```
+And to obtain predictions for the test data from the trained models, run
+```
+python predict_from_model.py
+```
+
+## Citation
+If you use this code, consider citing our paper:
+```
+@inproceedings{girrbach-2023-tu,
+    title = {T{\"u}-{CL} at {SIGMORPHON} 2023: Straight-Through Gradient Estimation for Hard Attention},
+    author = "Girrbach, Leander",
+    booktitle = "Proceedings of the 20th SIGMORPHON workshop on Computational Research in Phonetics, Phonology, and Morphology",
+    month = jul,
+    year = "2023",
+    address = "Toronto, Canada",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2023.sigmorphon-1.17",
+    pages = "151--165",
+}
 ```
 
 
