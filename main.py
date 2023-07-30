@@ -32,13 +32,35 @@ def make_argument_parser() -> argparse.ArgumentParser:
         required=True,
         choices=list(language_code_mapping.keys()),
     )
-    parser.add_argument("--track", type=int, required=True, choices=[1, 2])
-    parser.add_argument("--layers", type=int, default=1)
-    parser.add_argument("--dropout", type=float, default=0.1)
-    parser.add_argument("--hidden", type=int, default=512)
-    parser.add_argument("--gamma", type=float, default=0.98)
-    parser.add_argument("--batch", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=25)
+    parser.add_argument(
+        "--track",
+        type=int,
+        required=True,
+        choices=[1, 2],
+        help="Shared Task track. Can be 1 (closed) or 2 (open).",
+    )
+    parser.add_argument(
+        "--layers", type=int, default=1, help="Num. layers of BiLSTM encoder."
+    )
+    parser.add_argument(
+        "--dropout", type=float, default=0.1, help="Dropout probability."
+    )
+    parser.add_argument(
+        "--hidden", type=int, default=512, help="Hidden size of BiLSTM encoder."
+    )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=0.98,
+        help="Learning rate decay of exponential lr scheduler.",
+    )
+    parser.add_argument("--batch", type=int, default=32, help="Batch size.")
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=25,
+        help="Max. num. epochs (early stopping always enabled).",
+    )
 
     args = parser.parse_args()
     return args
