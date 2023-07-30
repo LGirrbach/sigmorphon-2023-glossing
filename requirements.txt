@@ -1,0 +1,15 @@
+edist==1.2.0
+lingpy==2.6.9
+nltk
+numpy
+optuna==3.1.0
+pandas==1.5.3
+pytorch-lightning==1.9.4
+rich==13.3.2
+scikit-learn
+scipy==1.10.0
+seaborn
+torch==1.13.1
+torch-scatter
+torchmetrics==0.11.3
+tqdm
