@@ -16,13 +16,15 @@ Activate the environment:
 ```
 conda activate glossing
 ```
-And finally install the dependencies in [requirements.txt]:
+Then, install the dependencies in [requirements.txt]:
 ```
 pip install -r requirements.txt
 ```
 
+Finally, place the shared task data in the repository, i.e. there should be a folder called `data`, which can be obtained from [the shared task's main repository](https://github.com/sigmorphon/2023glossingST).
+
 ## Train a model
-To train a single model, run
+To train a single model and get predictions for the corresponding test set, run
 ```
 python main.py --language LANGUAGE --model MODEL --track TRACK
 ```
@@ -30,8 +32,6 @@ Only languages in the shared task dataset are supported. `MODEL` can be `ctc` fo
 ```
 python main.py --help
 ```
-
-The above script creates a file with the test set predictions in the current directory.
 
 ## Hyperparameter tuning
 To obtain best hyperparameters, you can use the script [hyperparameter_tuning.py](hyperparameter_tuning.py):
