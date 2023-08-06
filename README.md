@@ -16,7 +16,7 @@ Activate the environment:
 ```
 conda activate glossing
 ```
-Then, install the dependencies in [requirements.txt]:
+Then, install the dependencies in [requirements.txt](requirements.txt):
 ```
 pip install -r requirements.txt
 ```
